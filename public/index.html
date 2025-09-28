@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smart Plan – v8.3 (KI‑Hook)</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#111829; --card:#151e31; --ink:#e9eefc; --muted:#9fb0d0;
+    --line:#24314d; --accent:#77a6ff; --ok:#31d0aa; --warn:#ffc861; --bad:#ff6b7a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  header{position:sticky;top:0;background:rgba(16,23,39,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:50}
+  .wrap{max-width:980px;margin:0 auto;padding:14px}
+  h1{margin:0 0 6px;font-size:22px}
+  .sub{color:var(--muted);font-size:13px;margin:0}
+  .tabs{display:flex;gap:8px;margin-top:10px}
+  .tab{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;user-select:none}
+  .tab.active{background:linear-gradient(180deg,#8bb8ff,#5b8cff);color:#081122;border:none}
+  .section{display:none}.section.active{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:14px}
+  .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .col-12{grid-column:1/-1}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}
+  @media (max-width:860px){ .row>[class*="col-"]{grid-column:1/-1} }
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input,select,button{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 12px;color:var(--ink);}
+  input,select{margin-bottom:10px}
+  button{cursor:pointer;transition:.15s ease}
+  button:hover{border-color:var(--accent)}
+  .btn-primary{background:linear-gradient(180deg,#8bb8ff,#5b8cff);color:#081122;border:none;box-shadow:0 8px 20px rgba(91,140,255,.18)}
+  .btn-ghost{background:transparent}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .pill{display:inline-block;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .timeline{border-left:2px solid var(--line);padding-left:12px;margin-top:8px}
+  .event{margin:8px 0}
+  .event .time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;opacity:.9}
+  .event .title{font-weight:600}
+  .event .note{color:var(--muted);font-size:13px}
+  .divider{margin:14px 0 6px;color:#9fb0d0;display:flex;align-items:center;gap:8px}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0e1526;border:1px solid var(--line);padding:10px 14px;border-radius:12px;display:none;z-index:60}
+  .foot{font-size:12px;color:var(--muted);margin-top:8px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--line);font-size:12px;margin-right:6px}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Smart Plan – v8.3 (KI‑Plan)</h1>
+    <p class="sub">Button „🤖 KI‑Plan“ nutzt ein Backend /ai/plan (JSON‑Output). Fällt es aus, greift der lokale Generator.</p>
+    <div class="tabs">
+      <div class="tab active" data-tab="plan">Plan</div>
+      <div class="tab" data-tab="prayer">Gebetszeiten</div>
+      <div class="tab" data-tab="about">Info</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <section id="plan" class="section active">
+    <div class="card">
+      <h3>1) Standort & Methode</h3>
+      <div class="row">
+        <div class="col-4"><label>Stadt</label><input id="city" value="Dortmund"></div>
+        <div class="col-4"><label>Land</label><input id="country" value="Germany"></div>
+        <div class="col-4"><label>Methode</label>
+          <select id="method">
+            <option value="3">Muslim World League (3)</option>
+            <option value="2">ISNA (2)</option>
+            <option value="5">Egyptian GA (5)</option>
+            <option value="1">Karachi (1)</option>
+            <option value="4">Umm al-Qura (4)</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="loadTimes" class="btn-primary">Gebetszeiten laden</button>
+        <span id="timesStatus" class="pill">Noch nicht geladen</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2) Deine Zeiten</h3>
+      <div class="row">
+        <div class="col-3"><label>Arbeitsbeginn (optional)</label><input id="workStart" type="time"></div>
+        <div class="col-3"><label>Arbeitsende (optional)</label><input id="workEnd" type="time"></div>
+        <div class="col-3"><label>Heimweg (Min.)</label><input id="commuteMin" type="number" value="20" min="0" step="5"></div>
+        <div class="col-3"><label>Schlafziel (Std./Tag)</label><input id="sleepTarget" type="number" value="7" min="4" max="10" step="0.25"></div>
+        <div class="col-3"><label>Business (Min/Tag)</label><input id="bizTarget" type="number" value="120" min="60" max="480" step="15"></div>
+        <div class="col-3"><label>Sport-Muster</label>
+          <select id="sportPattern">
+            <option value="daily">Täglich</option>
+            <option value="every2">Alle 2 Tage</option>
+            <option value="every3" selected>Alle 3 Tage</option>
+            <option value="weekdays">Nur Wochentage (Mo–Fr)</option>
+            <option value="weekend">Nur Wochenende (Sa–So)</option>
+          </select>
+        </div>
+        <div class="col-3"><label>Rhythmus Starttag (0=Mo … 6=So)</label><input id="sportOffset" type="number" value="0" min="0" max="6"></div>
+        <div class="col-3"><label>Woche beginnt</label><input id="weekStart" type="date"></div>
+      </div>
+      <div class="toolbar">
+        <button id="generatePlan" class="btn-primary">🔁 7‑Tage‑Plan (Regeln)</button>
+        <button id="generateAI" class="btn-primary">🤖 7‑Tage‑Plan (KI)</button>
+        <button id="clearPlan" class="btn-ghost">Zurücksetzen</button>
+      </div>
+      <p class="foot">KI liefert nur Vorschlag‑JSON; Regeln clippen/prüfen. Fallback auf lokale Logik, wenn /ai/plan nicht erreichbar.</p>
+    </div>
+
+    <div class="card">
+      <h3>3) Ergebnis</h3>
+      <div id="planOutput" class="muted">Noch kein Plan generiert.</div>
+    </div>
+  </section>
+
+  <section id="prayer" class="section">
+    <div class="card">
+      <h3>Gebetszeiten dieser Woche</h3>
+      <div class="pill" id="range"></div>
+      <div style="overflow:auto; margin-top:10px">
+        <table>
+          <thead><tr><th>Tag</th><th>Fajr</th><th>Dhuhr</th><th>Asr</th><th>Maghrib</th><th>Isha</th></tr></thead>
+          <tbody id="timesTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" class="section">
+    <div class="card">
+      <h3>Info & Backend</h3>
+      <p>Endpoint: <code>POST /ai/plan</code> (siehe <em>server_ai_example.js</em>), Antwort ausschließlich JSON gemäß Schema.</p>
+      <div class="toolbar">
+        <button id="downloadBtn" class="btn-primary">⬇️ Diese App speichern (HTML)</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", ()=>{
+  // ===== Utilities (aus v8.2) =====
+  const $ = s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+  const dayNames=["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+  const fmtDate=d=>d.toISOString().slice(0,10);
+  const parseDate=s=>new Date(s+"T00:00:00");
+  const monday=(d=new Date())=>{const nd=new Date(d);nd.setHours(0,0,0,0);const w=(nd.getDay()+6)%7;nd.setDate(nd.getDate()-w);return nd;};
+  const toast=(m)=>{const t=$("#toast");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",2200);};
+  const toMin=hhmm=>{if(!hhmm)return null;const [h,m]=hhmm.split(":").map(Number);return h*60+m};
+  const round5=min=>Math.round(min/5)*5;
+  const fromMin=min=>{if(min==null)return"";min=(min+1440)%1440;const h=String(Math.floor(min/60)).padStart(2,"0"),m=String(min%60).padStart(2,"0");return `${h}:${m}`};
+
+  function safeStorage(){try{const k="__t";localStorage.setItem(k,"1");localStorage.removeItem(k);return localStorage;}catch(e){let mem={};return{getItem:(k)=>mem[k]||null,setItem:(k,v)=>{mem[k]=String(v)},removeItem:(k)=>{delete mem[k]}};}}
+  const storage=safeStorage();const STORAGE_KEY="sp_v83_ai";const PRAYER_CACHE_KEY="smartplan_prayer_cache_v1";
+  const loadJSON=(k,d)=>{try{const v=storage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
+  const saveJSON=(k,o)=>{try{storage.setItem(k,JSON.stringify(o));}catch(e){}};
+
+  let store=loadJSON(STORAGE_KEY,{});
+  store.settings=Object.assign({city:"Dortmund",country:"Germany",method:"3",workStart:"",workEnd:"",commuteMin:20,sleepTarget:7,bizTarget:120,sportPattern:"every3",sportOffset:0,weekStart:fmtDate(monday())},store.settings||{});
+  let cache=loadJSON(PRAYER_CACHE_KEY,{});
+
+  // init inputs
+  $("#city").value=store.settings.city; $("#country").value=store.settings.country; $("#method").value=String(store.settings.method);
+  $("#workStart").value=store.settings.workStart; $("#workEnd").value=store.settings.workEnd;
+  $("#commuteMin").value=store.settings.commuteMin; $("#sleepTarget").value=store.settings.sleepTarget;
+  $("#bizTarget").value=store.settings.bizTarget; $("#sportPattern").value=store.settings.sportPattern;
+  $("#sportOffset").value=store.settings.sportOffset; $("#weekStart").value=store.settings.weekStart;
+
+  const saveSettings=()=>{store.settings.city=$("#city").value||"Dortmund";store.settings.country=$("#country").value||"Germany";
+    store.settings.method=String($("#method").value||"3");store.settings.workStart=$("#workStart").value||"";store.settings.workEnd=$("#workEnd").value||"";
+    store.settings.commuteMin=Number($("#commuteMin").value||20);store.settings.sleepTarget=Number($("#sleepTarget").value||7);
+    store.settings.bizTarget=Number($("#bizTarget").value||120);store.settings.sportPattern=$("#sportPattern").value||"every3";
+    store.settings.sportOffset=Number($("#sportOffset").value||0);store.settings.weekStart=$("#weekStart").value||fmtDate(monday());saveJSON(STORAGE_KEY,store);};
+  $$("#plan input, #plan select").forEach(el=>el.addEventListener("change",saveSettings));
+
+  // Tabs
+  $$(".tab").forEach(tab=>tab.addEventListener("click",()=>{$$(".tab").forEach(t=>t.classList.remove("active"));tab.classList.add("active");$$(".section").forEach(s=>s.classList.remove("active"));$("#"+tab.dataset.tab).classList.add("active");if(tab.dataset.tab==="prayer")renderTimesTable();}));
+
+  // Prayer API
+  const pKey=(city,country,method,year,month)=>`${city}|${country}|${method}|${year}-${String(month).padStart(2,'0')}`;
+  async function ensureMonth(city,country,method,year,month){
+    const key=pKey(city,country,method,year,month); if(cache[key]) return cache[key];
+    const url=`https://api.aladhan.com/v1/calendarByCity?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=${encodeURIComponent(method)}&month=${month}&year=${year}&school=1`;
+    try{const res=await fetch(url,{cache:"reload"});const data=await res.json();if(data.code!==200)throw new Error("API "+data.code);
+      const out={};(data.data||[]).forEach(item=>{const [dd,mm,yy]=item.date.gregorian.date.split('-');const dstr=`${yy}-${mm}-${dd}`;
+        const t=item.timings,clean=x=>(x||"").split(" ")[0];out[dstr]={Fajr:clean(t.Fajr),Dhuhr:clean(t.Dhuhr),Asr:clean(t.Asr),Maghrib:clean(t.Maghrib),Isha:clean(t.Isha)};});
+      cache[key]=out;saveJSON(PRAYER_CACHE_KEY,cache);return out;}catch(e){toast("Gebetszeiten konnten nicht geladen werden.");return{};}
+  }
+  async function getTimes(dateStr){const d=new Date(dateStr);const y=d.getFullYear(),m=d.getMonth()+1;const s=store.settings;const md=await ensureMonth(s.city,s.country,s.method,y,m);return md[dateStr]||null;}
+  async function preloadWeek(){const ws=parseDate(store.settings.weekStart);const end=new Date(ws);end.setDate(end.getDate()+6);
+    const months=new Set();for(let d=new Date(ws);d<=end;d.setDate(d.getDate()+1)){months.add(`${d.getFullYear()}-${d.getMonth()+1}`);}for(const ym of months){const [yy,mm]=ym.split("-").map(Number);await ensureMonth(store.settings.city,store.settings.country,store.settings.method,yy,mm);}}
+  $("#loadTimes").addEventListener("click",async()=>{saveSettings();await preloadWeek();const ws=parseDate(store.settings.weekStart);const end=new Date(ws);end.setDate(end.getDate()+6);
+    $("#timesStatus").textContent="Geladen: "+fmtDate(ws)+" – "+fmtDate(end);renderTimesTable();toast("Gebetszeiten geladen ✔");});
+  $("#downloadBtn").addEventListener("click",()=>{const blob=new Blob([document.documentElement.outerHTML],{type:"text/html"});const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download="smart_plan_v8_3_ai.html";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast("Download gestartet");});
+  $("#clearPlan").addEventListener("click",()=>{$("#planOutput").innerHTML="<span class='muted'>Noch kein Plan generiert.</span>";toast("Zurückgesetzt");});
+
+  // ===== Regel-Generator (aus v8.2, gekürzt) =====
+  function pushEvent(arr,start,end,title,type,note=""){ if(start==null)return; if(end!=null && end<start)end=start;
+    const minByType={sleep:90,biz:30,sport:35,meal:25,commute:10,snack:10,work:15}; const dur=end!=null?(end-start):0; if(end!=null && dur<(minByType[type]||0))return;
+    arr.push({start:round5(start),end:end!=null?round5(end):null,title,type,note}); }
+  function sortEvents(arr){arr.sort((a,b)=>a.start-b.start);}
+  function resolveOverlaps(arr){sortEvents(arr);for(let i=0;i<arr.length-1;i++){const cur=arr[i],next=arr[i+1];if(cur.type==="divider"||next.type==="divider")continue;
+      if(cur.end!=null && next.start<cur.end){next.start=cur.end;if(next.end!=null && next.end<next.start){next.end=next.start;}}}return arr;}
+  function clipAndMerge(arr){const resolved=resolveOverlaps(arr);const out=[];for(const e of resolved){if(e.type==="divider"){out.push(e);continue;}const last=out[out.length-1];
+      if(last && last.type===e.type && last.end!=null && e.end!=null && (e.start-last.end)<=5){last.end=Math.max(last.end,e.end);if(last.title!==e.title)last.title=`${last.title} + ${e.title}`;} else out.push(e);}return out;}
+  function renderEvents(container, events, targets, A){
+    container.innerHTML="";
+    const iconByType={work:"🧱",sleep:"💤",meal:"🍽",sport:"💪",biz:"📈",commute:"🚶",snack:"🥪",divider:"🙏"};
+    let sleepSum=0,bizSum=0,sport=false;
+    ["Fajr","Dhuhr","Asr","Maghrib","Isha"].forEach(p=>{ if(A[p]!=null){ const div=document.createElement("div"); div.className="divider"; div.textContent=`🙏 ${p}`; container.appendChild(div); } });
+    for(const e of events){ if(e.type==="divider") continue; const dur=e.end!=null?(e.end-e.start):0; if(e.end!=null && dur<1) continue;
+      const row=document.createElement("div"); row.className="event"; const time=`<span class="time">${fromMin(e.start)}${e.end!=null?`–${fromMin(e.end)}`:""}</span>`;
+      row.innerHTML=`${time} · <span class="title">${iconByType[e.type]||""} ${e.title}</span> ${e.note?`<div class="note">${e.note}</div>`:""}`; container.appendChild(row);
+      if(e.type==="sleep" && e.end!=null) sleepSum+=dur; if(e.type==="biz" && e.end!=null) bizSum+=dur; if(e.type==="sport") sport=true; }
+    const foot=document.createElement("div"); foot.className="foot";
+    const sleepOK=sleepSum>=targets.sleep, bizOK=bizSum>=targets.biz;
+    foot.innerHTML=`<span class="badge ${sleepOK?'ok':(sleepSum>=targets.sleep*0.7?'warn':'bad')}">Schlaf ${(sleepSum/60).toFixed(1)}h / ${(targets.sleep/60).toFixed(1)}h</span>
+                    <span class="badge ${bizOK?'ok':(bizSum>=targets.biz*0.7?'warn':'bad')}">Business ${Math.round(bizSum)}m / ${Math.round(targets.biz)}m</span>
+                    <span class="badge ${sport?'ok':'bad'}">Sport ${sport?'Ja':'–'}</span>`;
+    container.appendChild(foot);
+  }
+
+  // Build prayer windows & helper
+  async function buildContextForDay(dateStr){
+    const s=store.settings;
+    const times=await getTimes(dateStr).catch(()=>null)||{}; const A={}; ["Fajr","Dhuhr","Asr","Maghrib","Isha"].forEach(p=>A[p]=times[p]||null);
+    const anchors=[0, A.Fajr && toMin(A.Fajr), A.Dhuhr && toMin(A.Dhuhr), A.Asr && toMin(A.Asr), A.Maghrib && toMin(A.Maghrib), A.Isha && toMin(A.Isha), 1440].filter(v=>v!=null);
+    const windows=[]; for(let j=0;j<anchors.length-1;j++){windows.push([anchors[j],anchors[j+1]]);}
+    return {A, windows, times};
+  }
+
+  // Local generator (rule-based) – reusing v8.2 core
+  async function generateRulePlanForDay(dateStr){
+    const s=store.settings; const {A, windows, times} = await buildContextForDay(dateStr);
+    const workStart=toMin(s.workStart), workEndRaw=toMin(s.workEnd); let ws=workStart,we=workEndRaw; if(ws!=null && we!=null && we<=ws) we+=1440;
+    const commute=Number(s.commuteMin)||0; const sleepGoal=Math.round((Number(s.sleepTarget)||7)*60); const bizGoal=Number(s.bizTarget)||120;
+    const E=[];
+    if(ws!=null && we!=null){ E.push({start:ws,end:we,title:"Arbeit",type:"work"}); const cEnd=we+Math.max(10,commute); E.push({start:we,end:cEnd,title:"Heimweg",type:"commute"}); E.push({start:cEnd,end:cEnd+20,title:"Snack",type:"snack"}); }
+    function windowClip(sMin,eMin){ if(ws==null || we==null) return [sMin,eMin]; if(eMin<=ws || sMin>=we) return [sMin,eMin]; if(sMin<ws) return [sMin,Math.min(eMin,ws)]; return [Math.max(sMin,we),eMin]; }
+    function place(sMin,eMin,want,title,type,note=""){ if(sMin==null||eMin==null)return 0; let [S,E]=windowClip(sMin,eMin); if(E-S<15)return 0; S=round5(S);E=round5(E); const use=Math.min(want,E-S); if(use<=0)return 0; pushEvent(EV,S,S+use,title,type,note); return use; }
+    const EV=E;
+    // Sleep simple: compact if big window else 60/40 (kurz)
+    function largestFreeWindow(){ let best=null,size=0; for(const [wS,wE] of windows){ const [S,E]=windowClip(wS,wE); if(E-S>size){size=E-S;best=[S,E];}} return {best,size}; }
+    const {best:bigWin,size:bigSize}=largestFreeWindow(); const sleepGoalMin=sleepGoal; const single=bigWin && bigSize>=sleepGoalMin*0.8;
+    if(single){ place(bigWin[0],bigWin[1],sleepGoalMin,"Schlaf (kompakt)","sleep"); } else { let s1=Math.max(180,Math.min(270,Math.round(sleepGoalMin*0.6))), s2=sleepGoalMin-s1;
+      const postSnack=(we!=null)?(we+Math.max(10,commute)+30):null; if(postSnack!=null){ for(const [wS,wE] of windows){ if(wE<=postSnack) continue; const got=place(postSnack,wE,s1,"Schlafblock 1","sleep","~60%"); s1-=got; if(s1<=0) break; } }
+      if(s1>0 && bigWin){ s1-=place(bigWin[0],bigWin[1],s1,"Schlafblock 1","sleep","~60%"); } if(s2>0 && A.Maghrib && A.Isha){ s2-=place(toMin(A.Maghrib)+40,toMin(A.Isha)-10,s2,"Schlafblock 2","sleep"); }
+      if(s2>0 && A.Isha){ s2-=place(toMin(A.Isha)+20,1440,s2,"Schlafblock 2 (spät)","sleep"); } }
+    // Biz
+    let bizLeft=bizGoal,lastBizIndex=-1; function placeBiz(s,e,w,t,n){const before=EV.length;const got=place(s,e,w,t,"biz",n);if(EV.length>before)lastBizIndex=EV.length-1;return got;}
+    if(A.Dhuhr&&A.Asr) bizLeft -= placeBiz(toMin(A.Dhuhr)+10,toMin(A.Asr)-10,Math.min(90,bizLeft),"Deep Work 1","Dhuhr→Asr");
+    if(A.Asr&&A.Maghrib&&bizLeft>0) bizLeft -= placeBiz(toMin(A.Asr)+10,toMin(A.Maghrib)-10,Math.min(90,bizLeft),"Deep Work 2","Asr→Maghrib");
+    if(bizLeft>0 && A.Isha) bizLeft -= placeBiz(toMin(A.Isha)+20,1440,Math.max(30,Math.min(90,bizLeft)),"Content / Review","nach Isha");
+    if(bizLeft>0 && bizLeft<30 && lastBizIndex>=0){ const last=EV[lastBizIndex]; if(last.end!=null) last.end += Math.min(30,bizLeft), bizLeft=0; }
+    // Meals
+    if(A.Dhuhr&&A.Asr) place(toMin(A.Dhuhr)+5,toMin(A.Asr)-5,30,"Mittagessen","meal");
+    if(A.Maghrib&&A.Isha) place(toMin(A.Maghrib)+5,toMin(A.Isha)-5,30,"Abendessen","meal");
+    // Sport daily simple
+    const idx=(new Date(dateStr).getDay()+6)%7; const pattern=store.settings.sportPattern; let doSport=false;
+    switch(pattern){case"daily":doSport=true;break;case"every2":doSport=((idx-store.settings.sportOffset)%2===0);break;case"every3":doSport=((idx-store.settings.sportOffset)%3===0);break;case"weekdays":doSport=(idx<5);break;case"weekend":doSport=(idx>=5);break;}
+    if(doSport){ if(A.Asr&&A.Maghrib) place(toMin(A.Asr)+10,toMin(A.Maghrib)-10,55,"Sport","sport"); else if(A.Isha) place(toMin(A.Isha)+15,1440,45,"Sport (spät)","sport"); }
+    const final=clipAndMerge(EV);
+    return { A: {Fajr:A.Fajr, Dhuhr:A.Dhuhr, Asr:A.Asr, Maghrib:A.Maghrib, Isha:A.Isha}, events: final, goals:{sleep:sleepGoalMin, biz:bizGoal} , times };
+  }
+
+  // ===== KI-Plan =====
+  function buildDayPayload(dateStr, A, goals){
+    return {
+      day: dateStr,
+      anchors: A,
+      goals: { sleepMin: goals.sleep, businessMin: goals.biz, sport: true },
+      prefs: {
+        workStart: store.settings.workStart || null,
+        workEnd: store.settings.workEnd || null,
+        commuteMin: store.settings.commuteMin,
+        sportPattern: store.settings.sportPattern,
+        sportOffset: store.settings.sportOffset
+      }
+    };
+  }
+  async function generateWithAI(payload){
+    const res = await fetch("/ai/plan", {
+      method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error("AI endpoint not available");
+    const json = await res.json();
+    if(!json.ok || !json.plan || !Array.isArray(json.plan.events)) throw new Error("Invalid AI response");
+    return json.plan;
+  }
+
+  function aiEventsToInternal(ai){
+    // map {start:"HH:MM", end:"HH:MM", type, label, note} -> internal
+    return (ai.events||[]).map(ev=> ({
+      start: toMin(ev.start), end: toMin(ev.end), title: ev.label || ev.type, type: mapType(ev.type), note: ev.note||""
+    }));
+    function mapType(t){ return ({sleep:"sleep", biz:"biz", sport:"sport", meal:"meal", commute:"commute", work:"work", nap:"sleep"})[t] || "biz"; }
+  }
+
+  async function renderWeek(usingAI=false){
+    const s=store.settings; const ws=parseDate(s.weekStart); const out=$("#planOutput"); out.innerHTML="";
+    await preloadWeek().catch(()=>{});
+
+    for(let i=0;i<7;i++){
+      const d=new Date(ws); d.setDate(d.getDate()+i); const key=fmtDate(d);
+      const rule = await generateRulePlanForDay(key); // fallback & Kontext
+      let events = rule.events; let A = rule.A; let goals = {sleep:rule.goals.sleep, biz:rule.goals.biz};
+
+      if(usingAI){
+        try{
+          const payload = buildDayPayload(key, A, goals);
+          const aiPlan = await generateWithAI(payload);
+          // map & then still clip/merge with our safety net
+          const mapped = aiEventsToInternal(aiPlan);
+          events = clipAndMerge(mapped);
+          toast(`KI-Plan geladen für ${key}`);
+        }catch(e){
+          toast("KI-Endpoint nicht erreichbar – nutze Regel-Plan");
+        }
+      }
+
+      const card=document.createElement("div"); card.className="card";
+      const headerTimes=Object.entries(rule.times).map(([k,v])=>`${k} ${v||"–:–"}`).join(" · ");
+      card.innerHTML=`<h4 style="margin:0 0 6px">${dayNames[i]} · ${key}</h4><div class="muted">${headerTimes}</div><div class="timeline"></div>`;
+      const tl=card.querySelector(".timeline");
+      renderEvents(tl, events, goals, {Fajr: toMin(A.Fajr), Dhuhr: toMin(A.Dhuhr), Asr: toMin(A.Asr), Maghrib: toMin(A.Maghrib), Isha: toMin(A.Isha)});
+      out.appendChild(card);
+    }
+  }
+
+  // Buttons
+  $("#generatePlan").addEventListener("click", ()=> renderWeek(false));
+  $("#generateAI").addEventListener("click", ()=> renderWeek(true));
+
+  // Prayer table
+  function setRangeLabel(){const ws=parseDate(store.settings.weekStart);const end=new Date(ws);end.setDate(end.getDate()+6);$("#range").textContent=`${fmtDate(ws)} – ${fmtDate(end)} · ${store.settings.city}, ${store.settings.country}`;}
+  async function renderTimesTable(){setRangeLabel();const ws=parseDate(store.settings.weekStart);const tbody=$("#timesTable");tbody.innerHTML="";
+    for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);const key=fmtDate(d);const times=await getTimes(key).catch(()=>null);
+      const tr=document.createElement("tr");const td0=document.createElement("td");td0.textContent=dayNames[i]+" "+key;tr.appendChild(td0);
+      ["Fajr","Dhuhr","Asr","Maghrib","Isha"].forEach(p=>{const td=document.createElement("td");td.textContent=times?times[p]:"– : –";tr.appendChild(td);});tbody.appendChild(tr);}}
+
+  // init
+  setRangeLabel();
+});
+</script>
+</body>
+</html>
